@@ -26,10 +26,10 @@
     }
 
     body {
-      min-width: 320px;
+      min-width: 0;
       min-height: 100vh;
       margin: 0;
-      padding: 48px 20px;
+      padding: clamp(16px, 5vw, 48px) clamp(10px, 4vw, 20px);
       display: grid;
       place-items: center;
       background:
@@ -44,7 +44,8 @@
 
     .game {
       width: min(100%, 600px);
-      padding: clamp(24px, 6vw, 48px);
+      min-width: 0;
+      padding: clamp(18px, 5vw, 48px);
       border: 1px solid var(--border);
       border-radius: 24px;
       background: rgb(27 38 56 / 94%);
@@ -63,8 +64,9 @@
 
     h1 {
       margin: 0;
-      font-size: clamp(2rem, 8vw, 3rem);
+      font-size: clamp(1.7rem, 8vw, 3rem);
       letter-spacing: -0.05em;
+      overflow-wrap: anywhere;
     }
 
     .intro {
@@ -80,6 +82,7 @@
     }
 
     .move-button {
+      min-width: 0;
       min-height: 122px;
       padding: 16px 8px;
       display: grid;
@@ -112,7 +115,7 @@
     }
 
     .move-name {
-      font-size: 0.95rem;
+      font-size: clamp(0.78rem, 3.5vw, 0.95rem);
       font-weight: 700;
     }
 
@@ -124,10 +127,54 @@
       font-weight: 750;
     }
 
-    .round-summary {
-      min-height: 24px;
+    .round-display {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: clamp(8px, 2vw, 16px);
       margin: 0 0 26px;
+    }
+
+    .round-card {
+      min-width: 0;
+      min-height: 142px;
+      padding: 14px 8px;
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #141e2e;
+    }
+
+    .round-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .round-move-image {
+      display: block;
+      width: clamp(52px, 18vw, 96px);
+      aspect-ratio: 1;
+      object-fit: contain;
+    }
+
+    .round-move-image[hidden],
+    .round-placeholder[hidden] {
+      display: none;
+    }
+
+    .round-placeholder {
       color: var(--muted);
+      font-size: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .versus {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 750;
     }
 
     .scoreboard {
@@ -190,6 +237,7 @@
       margin: 22px 0 0;
       color: var(--muted);
       font-size: 0.8rem;
+      line-height: 1.8;
     }
 
     kbd {
@@ -202,21 +250,45 @@
     }
 
     @media (max-width: 420px) {
-      body {
-        padding: 20px 12px;
+      .game {
+        padding: clamp(16px, 5vw, 24px);
       }
 
       .moves {
-        gap: 8px;
+        gap: clamp(6px, 2vw, 8px);
       }
 
       .move-button {
-        min-height: 104px;
+        min-height: 100px;
+        padding: 12px 4px;
       }
 
       .move-button img {
-        width: 44px;
-        height: 44px;
+        width: clamp(38px, 13vw, 48px);
+        height: auto;
+        aspect-ratio: 1;
+      }
+
+      .round-display {
+        gap: 6px;
+      }
+
+      .round-card {
+        min-height: 128px;
+        padding: 10px 4px;
+      }
+
+      .scoreboard {
+        padding: 16px 6px;
+      }
+
+      .controls {
+        gap: 8px;
+      }
+
+      .control-button {
+        flex: 1 1 120px;
+        padding-inline: 10px;
       }
     }
 
@@ -252,7 +324,19 @@
     </section>
 
     <p class="result" aria-live="polite">Make your first move</p>
-    <p class="round-summary" aria-live="polite">Your move vs. the computer</p>
+    <section class="round-display" aria-label="Moves in this round">
+      <div class="round-card">
+        <span class="round-label">You</span>
+        <img class="round-move-image" data-round-image="player" alt="" hidden>
+        <span class="round-placeholder" data-round-placeholder="player">Choose a move</span>
+      </div>
+      <span class="versus" aria-hidden="true">VS</span>
+      <div class="round-card">
+        <span class="round-label">Computer</span>
+        <img class="round-move-image" data-round-image="computer" alt="" hidden>
+        <span class="round-placeholder" data-round-placeholder="computer">Waiting</span>
+      </div>
+    </section>
 
     <section class="scoreboard" aria-label="Score">
       <div class="score-item">
@@ -282,7 +366,8 @@
     const moves = ['rock', 'paper', 'scissors'];
     const score = loadScore();
     const resultElement = document.querySelector('.result');
-    const summaryElement = document.querySelector('.round-summary');
+    const playerMoveImage = document.querySelector('[data-round-image="player"]');
+    const computerMoveImage = document.querySelector('[data-round-image="computer"]');
     const autoPlayButton = document.querySelector('.auto-play');
     let isAutoPlaying = false;
     let autoPlayInterval;
@@ -347,9 +432,17 @@
       resultElement.textContent = outcome === 'ties'
         ? "It's a tie!"
         : outcome === 'wins' ? 'You win!' : 'You lose!';
-      summaryElement.textContent = `You chose ${capitalize(playerMove)}. The computer chose ${capitalize(computerMove)}.`;
+      showMoveImage(playerMoveImage, playerMove);
+      showMoveImage(computerMoveImage, computerMove);
       saveScore();
       renderScore();
+    }
+
+    function showMoveImage(image, move) {
+      image.src = `pictures/${move}-emoji.png`;
+      image.alt = capitalize(move);
+      image.hidden = false;
+      document.querySelector(`[data-round-placeholder="${image.dataset.roundImage}"]`).hidden = true;
     }
 
     function pickComputerMove() {
